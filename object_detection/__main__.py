@@ -3,7 +3,6 @@ import cvzone
 from ultralytics import YOLO
 from pathlib import Path
 import torch
-import torch
 from torchvision import transforms
 from PIL import Image
 import os
