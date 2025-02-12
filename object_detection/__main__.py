@@ -26,7 +26,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 model = YOLO(f'{MODELS_DIR}/models/yolov8n-face.pt').to(device)
 
-resnet50 = torch.load(f'{MODELS_DIR}/models/fine_tuned_resnet_30_10_2024_02_46_26.pt', map_location=torch.device(device))
+resnet50 = torch.load(f'{MODELS_DIR}/models/fer_resnet50.pt', map_location=torch.device(device))
 
 resnet50 = resnet50.to(device)
 
