@@ -14,7 +14,7 @@ prep = transforms.Compose([
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-resnet50 = torch.load('../models/fine_tuned_resnet.pt', map_location=torch.device(device))
+resnet50 = torch.load('../models/fer_resnet50.pt', map_location=torch.device(device))
 
 resnet50 = resnet50.to(device)
 
