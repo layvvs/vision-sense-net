@@ -95,24 +95,27 @@ def postprocess_output(outputs, orig_w, orig_h, conf_threshold=0.5, iou_threshol
 
 yolo = rt.InferenceSession('/Users/layvvs/Desktop/Studying/BMSTU/Diploma-2024-2025/code/vision-sense-net/models/yolov8n-face.onnx')
 
-img = Image.open('/Users/layvvs/Desktop/Studying/BMSTU/Diploma-2024-2025/code/vision-sense-net/onnx_convertion/2025-01-13 01.23.49.jpg')
+img = Image.open('image.png')
 
 img_yolo = np.expand_dims(np.array(img.resize((640, 640))).transpose(2, 0, 1).astype(np.float32) / 255, axis=0)
 
 yolo_results = yolo.run(None, {'images': np.array(img_yolo)})
 
 boxes, confidences = postprocess_output(yolo_results, img.width, img.height)
-img_croped = img.crop(boxes.squeeze())
-img_resnet = np.expand_dims(prep(img_croped).numpy(), axis=0)
-resnet = rt.InferenceSession('/Users/layvvs/Desktop/Studying/BMSTU/Diploma-2024-2025/code/vision-sense-net/models/fer_resnet50.onnx')
 
-resnet_results = resnet.run(None, {'images': img_resnet})
+for box, conf in zip(boxes, confidences):
 
-print(CLASSES[np.argmax(softmax(resnet_results))])
+    img_croped = img.crop(box.squeeze())
+    img_resnet = np.expand_dims(prep(img_croped).numpy(), axis=0)
+    resnet = rt.InferenceSession('/Users/layvvs/Desktop/Studying/BMSTU/Diploma-2024-2025/code/vision-sense-net/models/fer_resnet50.onnx')
 
-draw = ImageDraw.Draw(img)
-font = ImageFont.truetype('/Library/Fonts/Arial', size=30)
-for box in boxes:
-    draw.rectangle(box, outline='green', width=2)
-    draw.text((box[0], box[1]), CLASSES[np.argmax(softmax(resnet_results))], fill='black', font=font)
+    resnet_results = resnet.run(None, {'images': img_resnet})
+
+    print(CLASSES[np.argmax(softmax(resnet_results))])
+
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.truetype('/Library/Fonts/Arial', size=30)
+    for box in boxes:
+        draw.rectangle(box, outline='green', width=2)
+        draw.text((box[0], box[1]), CLASSES[np.argmax(softmax(resnet_results))], fill='black', font=font)
 img.show()

@@ -3,6 +3,6 @@ web:
   port: 6969
 streams:
   - name: fake1
-    url: 955e152c5b5b50b4462d7cc80a0b672c.mp4
+    url: /Users/layvvs/Downloads/955e152c5b5b50b4462d7cc80a0b672c.mp4
   - name: fake2
-    url: 43b95d56ef54a5f5b4981cf8c44b2405.mp4
+    url: /Users/layvvs/Downloads/human_active-4.mp4

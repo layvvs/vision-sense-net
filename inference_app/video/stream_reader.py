@@ -14,23 +14,14 @@ class StreamReader:
     def __init__(self, media: str, stream_url: str):
         self.media = media
         self.stream_url = stream_url
-        self.decoded_frames = deque(maxlen=10)
+        self.decoded_frames = deque(maxlen=25)
         self.thread = Thread(target=self._loop, name=f'{media}-stream-reader')
-        self._last_frame_at = 0
         self.stream_done = Event()
-
-    @property
-    def last_frame_at(self):
-        return self._last_frame_at
-
-    @last_frame_at.setter
-    def last_frame_at(self, value):
-        self._last_frame_at = value
 
     def _read_stream(self):
         container = av.open(self.stream_url, timeout=av_timeout)
         for frame in container.decode(video=0):
-            yield Frame.from_av_frame(frame)
+            yield Frame.from_av_frame(frame, self.media)
         self.stream_done.set()
 
     def _loop(self):
