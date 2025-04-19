@@ -2,7 +2,5 @@ web:
   host: 0.0.0.0
   port: 6969
 streams:
-  - name: fake1
-    url: /Users/layvvs/Downloads/955e152c5b5b50b4462d7cc80a0b672c.mp4
   - name: fake2
     url: /Users/layvvs/Downloads/human_active-4.mp4
