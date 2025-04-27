@@ -5,8 +5,7 @@ from tracker import (
     TrackEvents,
     TrackCreated,
     TrackUpdated,
-    TrackStarted,
-    TrackErrorDistance
+    TrackStarted
 )
 from utils import now_ms
 
@@ -31,13 +30,13 @@ class EventManager:
         for upd in updates:
             if isinstance(upd, TrackUpdated):
                 print('updated track:', upd.track.id)
+                if upd.track.is_started:
+                    events.append(upd.track)
             elif isinstance(upd, TrackCreated):
                 print('created track', upd.track.id)
             elif isinstance(upd, TrackStarted):
                 events.append(upd.track)
                 print('started track', upd.track.id)
-            elif isinstance(upd, TrackErrorDistance):
-                print('tracking error: bad distance')
         return events
 
     def process_detections(self, detections):
@@ -49,6 +48,16 @@ class EventManager:
     def stop(self):
         self._thread.join(5)
 
+    def cleanup(self):
+        if now_ms() - self.last_cleanup > CLEANUP:
+            try:
+                closed_tracks = self.tracker.close_old_tracks()
+                self.output.put_nowait(closed_tracks)
+            except Exception as exc:
+                print(exc)
+            finally:
+                self.last_cleanup = now_ms()
+
     def _loop(self):
         while True:
             try:
@@ -56,8 +65,7 @@ class EventManager:
                 events = self.process_detections(detections)
                 if events:
                     self.output.put_nowait(events)
-                if now_ms() - self.last_cleanup > CLEANUP:
-                    closed_tracks = self.tracker.close_old_tracks()
-                    self.output.put_nowait(closed_tracks)
+                self.cleanup()
             except Empty:
+                self.cleanup()
                 continue
