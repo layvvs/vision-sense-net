@@ -29,5 +29,5 @@ class ResNet(ONNXNet):
 
     def run(self, frame):
         result = self._run(self.preprocess(frame))
-        emotion_class = Emotions(np.argmax(softmax(result))).value
-        return emotion_class
+        emotion = Emotions(np.argmax(softmax(result))).name
+        return emotion

@@ -1,17 +1,18 @@
-from typing import Dict, TypeAlias, Union
+from typing import Dict, TypeAlias, Union, Any
 from snowflake import SnowflakeGenerator
 import numpy as np
 from dataclasses import dataclass, field
 
-from inference.utils import EmotionDetection
+from inference.emotions_detector import EmotionDetection
 from utils import now_ms
 
 
 SNOWFLAKE_EPOCH = 1288834974657
 MIN_TRACK_START_QUANTITY = 3
-MIN_FACE_DISTANCE_ADD = 0.5
-MAX_FACE_DISTANCE_CREATE = 0.3
+MIN_FACE_DISTANCE = 0.4
+MIN_FACE_QUALITY = 9.5
 TRACK_TIMEOUT = 30000  # ms
+MIN_APPEARANCE_DURATION = 40  # ms
 
 track_ids = SnowflakeGenerator(0, epoch=SNOWFLAKE_EPOCH)
 
@@ -19,8 +20,10 @@ track_ids = SnowflakeGenerator(0, epoch=SNOWFLAKE_EPOCH)
 TrackId: TypeAlias = int
 
 
-def cosine_sim(x, y):
-    return np.dot(x, y.T) / (np.linalg.norm(x) * np.linalg.norm(y))
+def cosine_sim(x, y) -> float:
+  dot_products = np.dot(x, y.T)
+  norm_products = np.linalg.norm(x) * np.linalg.norm(y)
+  return 1 - dot_products / (norm_products + 1e-07)
 
 
 @dataclass
@@ -28,24 +31,68 @@ class DetectionTrack:
     id: int
     media: str
     opened_at: int
+    started_at: int | None = None
+    started_pts: int | None = None
     updated_at: int | None = None
+    updated_pts: int | None = None
     closed_at: int | None = None
     preview: bytes | None = None
     emotions: list[int] = field(default_factory=list)
     embedding: list[float] | None = None
     box: list[float] | None = None
-    quality: float | None = 0
+    quality: float = 0
     detections: int = 0
+    current_emotion: str | None = None
+    emotion_first_appearance: int | None = None
+    emotion_last_appearance: int | None = None
+    aggregated_emotions: list[dict[str, Any]] = field(default_factory=list)
     last_detection_at: int = 0
 
     def _get_box_area(self, left, top, right, bottom):
         return (right - left) * (bottom - top)
 
+    @property
+    def is_started(self):
+        return self.started_at is not None
+
+    def start(self):
+        if self.is_started:
+            raise ValueError('already started')
+        now = now_ms()
+        self.started_at = now
+        self.updated_at = now
+
+    def _aggregate_emotions(self, emotion, timestamp):
+        if self.current_emotion is None:
+            self.current_emotion = emotion
+            self.emotion_first_appearance = timestamp
+            self.emotion_last_appearance = timestamp + MIN_APPEARANCE_DURATION
+            return
+        if self.current_emotion == emotion:
+            self.emotion_last_appearance = timestamp
+        else:
+            self.finalize_emotions_aggregation()
+            self._aggregate_emotions(emotion, timestamp)
+
+    def finalize_emotions_aggregation(self):
+        emotion = {
+            self.current_emotion: {
+                'first_appearance': self.emotion_first_appearance,
+                'last_appearance': self.emotion_last_appearance
+            }
+        }
+        self.aggregated_emotions.append(emotion)
+        self.current_emotion = None
+        self.emotion_first_appearance = None
+        self.emotion_last_appearance = None
+
     def add_detection(self, detection: EmotionDetection):
         self.detections += 1
         self.last_detection_at = now_ms()
-        self.updated_at = detection.pts
-        self.emotions.append(detection.emotion_class)
+        self.updated_at = self.last_detection_at
+        emotion = detection.emotion
+        self.emotions.append(emotion)
+        self._aggregate_emotions(emotion, self.last_detection_at)
         quality = detection.confidence * self._get_box_area(
             detection.left,
             detection.top,
@@ -61,12 +108,12 @@ class DetectionTrack:
         self.closed_at = now_ms()
 
     @classmethod
-    def create(self, media, opened_at) -> 'DetectionTrack':
+    def create(self, media) -> 'DetectionTrack':
         id = next(track_ids)
         return DetectionTrack(
             id=id,
             media=media,
-            opened_at=opened_at
+            opened_at=now_ms()
         )
 
 
@@ -91,47 +138,36 @@ class TrackStarted(TrackEventOk):
 class TrackEventError:
     ...
 
-
-class TrackErrorDistance(TrackEventError):
+class TrackErrorQuality(TrackEventError):
     ...
 
 
-TrackEvents = Union[TrackCreated, TrackUpdated, TrackStarted, TrackErrorDistance]
+TrackEvents = Union[TrackCreated, TrackUpdated, TrackStarted, TrackErrorQuality]
 
 
 class Tracker:
     _tracks: Dict[TrackId, DetectionTrack]
 
-    def __init__(
-        self,
-        start_quantity=MIN_TRACK_START_QUANTITY,
-        face_distance_add=MIN_FACE_DISTANCE_ADD,
-        face_distance_create=MAX_FACE_DISTANCE_CREATE,
-        timeout=TRACK_TIMEOUT
-    ):
+    def __init__(self):
         self._tracks = {}
-        self.start_quantity = start_quantity
-        self.min_face_distance_add = face_distance_add
-        self.min_face_distance_create = face_distance_create
-        self.timeout = timeout
 
     def _find_track(self, vector: list[float]) -> DetectionTrack:
         tracks = self._tracks.values()
         for track in tracks:
             sim = cosine_sim(track.embedding, vector)
-            if sim > self.min_face_distance_add:
+            if sim < MIN_FACE_DISTANCE:
                 return track
-            elif sim < self.min_face_distance_create:
-                return TrackErrorDistance()
             else:
                 return
 
     def update_track(self, detection: EmotionDetection):
+        embedding = detection.face_embedding
+        if np.linalg.norm(embedding) < MIN_FACE_QUALITY:
+            return TrackErrorQuality()
         if (track := self._find_track(detection.face_embedding)):
-            if isinstance(track, TrackErrorDistance):
-                return track
             track.add_detection(detection)
-            if track.detections >= self.start_quantity:
+            if not track.is_started and track.detections >= MIN_TRACK_START_QUANTITY:
+                track.start()
                 return TrackStarted(track)
             return TrackUpdated(track)
         else:
@@ -143,18 +179,19 @@ class Tracker:
     def _create_track(self, detection: EmotionDetection):
         return DetectionTrack.create(
             detection.media,
-            opened_at=detection.pts
         )
 
     def close_track(self, track_key: TrackId):
         track = self._tracks.pop(track_key)
+        track.finalize_emotions_aggregation()
         track.close()
+        print('closed track', track.id)
         return track
 
     def close_old_tracks(self):
         closed_tracks = []
         for key, track in list(self._tracks.items()):
-            if now_ms() - track.last_detection_at > self.timeout:
+            if now_ms() - track.last_detection_at > TRACK_TIMEOUT:
                 track = self.close_track(key)
-                closed_tracks.append(track)
+                if track.is_started: closed_tracks.append(track)
         return closed_tracks

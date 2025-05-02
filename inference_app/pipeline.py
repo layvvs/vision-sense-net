@@ -56,6 +56,7 @@ class Pipeline:
     def stop(self):
         self.streams_manager.stop()
         self.event_manager.stop()
+        print('EventManager stopped')
         self._thread.join(5)
 
     def __enter__(self):

@@ -1,9 +1,26 @@
 from .resnet import ResNet
 from .yolo import YOLO
-from .utils import EmotionDetection
 from .insightface import InsightFace
 
 import numpy as np
+from dataclasses import dataclass
+
+
+PREVIEW_SIZE = 256
+
+
+@dataclass
+class EmotionDetection:
+    media: str
+    pts: int
+    left: int
+    top: int
+    right: int
+    bottom: int
+    emotion: str
+    confidence: float
+    preview: bytes
+    face_embedding: list[float]
 
 
 def image_to_bytes(frame):
@@ -26,7 +43,7 @@ class EmotionsDetector:
         result = []
         for detection in detections:
             cropped_frame = self._crop(frame.body, detection.box_ltrb)
-            emotion_class = self.classifier.run(cropped_frame)
+            emotion = self.classifier.run(cropped_frame)
             face_embedding = self.embedder.run(cropped_frame)
             result.append(
                 EmotionDetection(
@@ -34,9 +51,9 @@ class EmotionsDetector:
                     frame.pts,
                     *detection.box_ltrb,
                     confidence=detection.confidence,
-                    emotion_class=emotion_class,
+                    emotion=emotion,
                     face_embedding=face_embedding,
-                    preview=image_to_bytes(cropped_frame)
+                    preview=image_to_bytes(cropped_frame.resize((PREVIEW_SIZE, PREVIEW_SIZE)))
                 )
             )
         return result
