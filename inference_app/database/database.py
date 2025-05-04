@@ -29,7 +29,7 @@ class DatabaseConnection:
             self._initialized = True
 
     async def connect(self):
-        self._redis = redis.Redis(
+        self._redis = redis.StrictRedis(
             host=self.host,
             port=self.port,
             db=self.db,
@@ -37,26 +37,18 @@ class DatabaseConnection:
             password=self.password,
             decode_responses=True,
         )
+        print('connected to database')
 
-    async def close(self):
-        if self._redis:
-            await self._redis.close()
+    async def get_records(self):
+        records = []
+        _, partial_keys = await self._redis.scan(count=100)
+
+        for key in partial_keys:
+            data = await self._redis.get(key)
+            if data:
+                records.append(data)
+
+        return records
 
     async def set(self, key: str, value: str):
         await self._redis.set(name=key, value=value)
-
-    async def get(self, key: str):
-        return await self._redis.get(name=key)
-
-    async def delete(self, key: str):
-        await self._redis.delete(key)
-
-    async def exists(self, key: str) -> bool:
-        result = await self._redis.exists(key)
-        return bool(result)
-
-    async def incr(self, key: str):
-        await self._redis.incr(name=key)
-
-    async def keys(self, pattern: str = "*"):
-        return await self._redis.keys(pattern)

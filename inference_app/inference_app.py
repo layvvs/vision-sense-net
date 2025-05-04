@@ -37,7 +37,6 @@ class InferenceApp:
 
     async def _main(self):
         await self.database.connect()
-        print('Connected to database')
         await self._process_events()
 
     def run(self):

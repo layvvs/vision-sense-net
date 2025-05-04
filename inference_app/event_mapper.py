@@ -34,28 +34,6 @@ def encode_preview(preview):
         return b64encode(buf.getvalue()).decode('utf-8')
 
 
-# def get_emotions_statistics(emotions, aggregated_emotions):
-#     emotions_hist = Counter(emotions)
-#     most_common_emotion, *_ = emotions_hist.most_common(1)[0]
-#     most_common_emotion_duration = 0
-#     emotions_duration = defaultdict(int)
-#     for emotion in aggregated_emotions:
-#         emotion_label, *_ = list(emotion.keys())
-#         dur = emotion[emotion_label]['last_appearance'] - emotion[emotion_label]['first_appearance']
-#         emotions_duration[emotion_label] += dur
-#         if emotion_label == most_common_emotion:
-#             most_common_emotion_duration += dur
-#     most_lasting_emotion, *_ = sorted(emotions_duration, key=lambda x: emotions_duration[x], reverse=True)
-
-#     return (
-#         emotions_hist,
-#         most_common_emotion,
-#         most_common_emotion_duration,
-#         emotions_duration,
-#         most_lasting_emotion
-#     )
-
-
 def get_emotions_statistics(emotions, aggregated_emotions):
     emotions_hist = Counter(emotions)
     
