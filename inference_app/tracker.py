@@ -105,7 +105,7 @@ class DetectionTrack:
             self.embedding = detection.face_embedding
 
     def close(self):
-        self.closed_at = now_ms()
+        self.closed_at = self.updated_at
 
     @classmethod
     def create(self, media) -> 'DetectionTrack':
