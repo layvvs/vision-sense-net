@@ -547,20 +547,12 @@
         const { first_appearance, last_appearance } = item[emotion];
         return {
           emotion,
-          duration: (last_appearance - first_appearance) / 1000, // в секундах
+          duration: (last_appearance - first_appearance) / 1000,
           label: translations[emotion] || emotion,
           color: emotionColors[emotion] || getRandomColor()
         };
       }).filter(item => item.duration > 0);
 
-      // Сортируем по времени появления
-      data.sort((a, b) => {
-        const aTime = emotionsAggregation.find(item => Object.keys(item)[0] === a.emotion)[a.emotion].first_appearance;
-        const bTime = emotionsAggregation.find(item => Object.keys(item)[0] === b.emotion)[b.emotion].first_appearance;
-        return aTime - bTime;
-      });
-
-      // Удаляем предыдущий график если существует
       if (canvas.chart) {
         canvas.chart.destroy();
       }
